@@ -37,7 +37,8 @@ public final class SimpleFilterRule implements FilterRule {
 
     @Override
     public boolean matches(final Object[] fieldValues) {
-        return true;
+        final Object fieldValue = fieldValues[fieldPath.valueIndex];
+        return isNotRule != operator.evaluate(fieldValue, value, toValue, isCaseSensitive);
     }
 
     @Override
