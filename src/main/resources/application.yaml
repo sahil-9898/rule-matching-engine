@@ -1,0 +1,16 @@
+spring:
+  application:
+    name: rule-matching-engine
+  web:
+    resources:
+      cache:
+        period: 60m
+application:
+  alert:
+    alertGenerators:
+      TEST:
+        messageType: JSON
+        disruptor:
+          ringBufferSize: 1024
+          ruleMatcherConsumers: 4
+          waitStrategy: SLEEPING_WAIT
