@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableMap;
 import com.sahil.matcher.config.AlertConfig;
 import com.sahil.matcher.config.AlertGeneratorConfig;
 import com.sahil.matcher.message.json.JsonMessageProcessor;
+import com.sahil.matcher.rules.AlertRuleIndexManager;
 import org.springframework.stereotype.Component;
 
 import java.util.concurrent.ExecutorService;
@@ -16,12 +17,12 @@ public final class AlertGenerators {
 
     private final ImmutableMap<String, AlertGenerator<?, ?>> generators;
 
-    public AlertGenerators(final AlertConfig alertConfig) {
+    public AlertGenerators(final AlertConfig alertConfig, final AlertRuleIndexManager alertRuleIndexManager) {
         final var builder = ImmutableMap.<String, AlertGenerator<?, ?>>builder();
 
         alertConfig.alertGenerators.forEach((name, config) -> {
             final AlertGenerator<?, ?> alertGenerator = switch (config.messageType()) {
-                case JSON -> createAlertGeneratorForJsonMessage(config);
+                case JSON -> createAlertGeneratorForJsonMessage(config, alertRuleIndexManager);
             };
             builder.put(name, alertGenerator);
         });
@@ -31,8 +32,8 @@ public final class AlertGenerators {
     }
 
     private AlertGenerator<String, JsonNode> createAlertGeneratorForJsonMessage(
-            final AlertGeneratorConfig config) {
-        return new AlertGenerator<>(config, new JsonMessageProcessor());
+            final AlertGeneratorConfig config, final AlertRuleIndexManager alertRuleIndexManager) {
+        return new AlertGenerator<>(config, new JsonMessageProcessor(), alertRuleIndexManager);
     }
 
     private void startAlertGenerators() {

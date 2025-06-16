@@ -7,7 +7,7 @@ import com.sahil.matcher.alert.consumer.MessageProcessorConsumer;
 import com.sahil.matcher.alert.consumer.RuleMatcherConsumer;
 import com.sahil.matcher.config.AlertGeneratorConfig;
 import com.sahil.matcher.message.MessageProcessor;
-import com.sahil.matcher.rules.RuleSet;
+import com.sahil.matcher.rules.AlertRuleIndexManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -19,19 +19,23 @@ public final class AlertGenerator<MessageType, DeserializedMessageType> {
 
     private final AlertGeneratorConfig alertGeneratorConfig;
 
+    private final AlertRuleIndexManager alertRuleIndexManager;
+
     private final Disruptor<DisruptorEvent<MessageType>> disruptor;
 
     public AlertGenerator(
             final AlertGeneratorConfig alertGeneratorConfig,
-            final MessageProcessor<MessageType, DeserializedMessageType> messageProcessor) {
+            final MessageProcessor<MessageType, DeserializedMessageType> messageProcessor,
+            final AlertRuleIndexManager alertRuleIndexManager) {
         this.alertGeneratorConfig = alertGeneratorConfig;
+        this.alertRuleIndexManager = alertRuleIndexManager;
         final RuleSet ruleSet = new RuleSet(List.of());
         final int numberOfThreads = alertGeneratorConfig.disruptorConfig().ruleMatcherConsumers();
         final RuleMatcherConsumer<MessageType>[] ruleMatcherConsumers = new RuleMatcherConsumer[numberOfThreads];
         for (int i = 0; i < numberOfThreads; i++) {
-            ruleMatcherConsumers[i] = new RuleMatcherConsumer<>(ruleSet, i, numberOfThreads);
+            ruleMatcherConsumers[i] = new RuleMatcherConsumer<>(i, numberOfThreads);
         }
-        final MessageProcessorConsumer<MessageType, DeserializedMessageType> messageProcessorConsumer = new MessageProcessorConsumer<>(messageProcessor, ruleSet);
+        final MessageProcessorConsumer<MessageType, DeserializedMessageType> messageProcessorConsumer = new MessageProcessorConsumer<>(messageProcessor);
         this.disruptor = new Disruptor<>(DisruptorEvent::new, alertGeneratorConfig.disruptorConfig().ringBufferSize(), DaemonThreadFactory.INSTANCE, ProducerType.SINGLE, alertGeneratorConfig.disruptorConfig().waitStrategy().create());
         this.disruptor.handleEventsWith(messageProcessorConsumer).then(ruleMatcherConsumers);
     }
@@ -42,5 +46,9 @@ public final class AlertGenerator<MessageType, DeserializedMessageType> {
 
     public void startDisruptor() {
         this.disruptor.start();
+    }
+
+    private void onUpdate(final MessageType msg) {
+        this.disruptor.publishEvent((event, sequence) -> event.messageReceived(msg, alertRuleIndexManager.getCurrentIndex()));
     }
 }
